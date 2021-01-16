@@ -132,8 +132,6 @@ if ( [ /interface list member find list=$WANIFLIST ] = "" ) do={
 # STEP 1
 :foreach WANIF in=$ALIVEWANS do={
 	:set IFNAME [ :pick $WANIF 0 [:find $WANIF " " ] ]
-	:set IFADDRMASK [ :pick $WANIF ([:find $WANIF "A:"]+2) ([:find $WANIF "W:"]-1) ]
-	:set WEIGHT [ :pick $WANIF ([:find $WANIF "W:"]+2) ([:find $WANIF "L:"]-1) ]
 	if ( [ /ip firewall mangle find comment="$COMMENT $IFNAME step-1" ] = "" ) do={
 		:set MSG "1. Marking incoming connections"
 		$OUTLOG $MSG
@@ -144,8 +142,6 @@ if ( [ /interface list member find list=$WANIFLIST ] = "" ) do={
 # STEP 2
 :foreach WANIF in=$ALIVEWANS do={
 	:set IFNAME [ :pick $WANIF 0 [:find $WANIF " " ] ]
-	:set IFADDRMASK [ :pick $WANIF ([:find $WANIF "A:"]+2) ([:find $WANIF "W:"]-1) ]
-	:set WEIGHT [ :pick $WANIF ([:find $WANIF "W:"]+2) ([:find $WANIF "L:"]-1) ]
 	if ( [ /ip firewall mangle find comment="$COMMENT $IFNAME step-2" ] = "" ) do={
 		:set MSG "2. Marking route by connections on output"
 		$OUTLOG $MSG
@@ -157,7 +153,6 @@ if ( [ /interface list member find list=$WANIFLIST ] = "" ) do={
 :foreach WANIF in=$ALIVEWANS do={
 	:set IFNAME [ :pick $WANIF 0 [:find $WANIF " " ] ]
 	:set IFADDRMASK [ :pick $WANIF ([:find $WANIF "A:"]+2) ([:find $WANIF "W:"]-1) ]
-	:set WEIGHT [ :pick $WANIF ([:find $WANIF "W:"]+2) ([:find $WANIF "L:"]-1) ]
 	if ( [ /ip firewall mangle find comment="$COMMENT $IFNAME step-3" ] = "" ) do={
 		:set MSG "2. Allow to access ISP subnet"
 		$OUTLOG $MSG
@@ -178,7 +173,6 @@ if ( [ /ip firewall mangle find chain=pcc comment~"$COMMENT PCC-$WEIGHTSUMM" ] =
 	/ip firewall mangle remove [/ip firewall mangle find chain=pcc comment~"$COMMENT PCC" ]
 	:foreach WANIF in=$ALIVEWANS do={
 		:set IFNAME [ :pick $WANIF 0 [:find $WANIF " " ] ]
-		:set IFADDRMASK [ :pick $WANIF ([:find $WANIF "A:"]+2) ([:find $WANIF "W:"]-1) ]
 		:set WEIGHT [ :pick $WANIF ([:find $WANIF "W:"]+2) ([:find $WANIF "L:"]-1) ]
 		:for n from=1 to=$WEIGHT step=1 do={
 			/ip firewall mangle add chain=pcc in-interface-list=$LANIFLIST dst-address-type=!local per-connection-classifier="both-addresses-and-ports:$WEIGHTSUMM/$COUNTER" action=mark-connection new-connection-mark="WAN-CON-$IFNAME" passthrough=yes comment="$COMMENT PCC-$WEIGHTSUMM step-4"
@@ -191,8 +185,6 @@ if ( [ /ip firewall mangle find chain=pcc comment~"$COMMENT PCC-$WEIGHTSUMM" ] =
 # STEP 5
 :foreach WANIF in=$ALIVEWANS do={
 	:set IFNAME [ :pick $WANIF 0 [:find $WANIF " " ] ]
-	:set IFADDRMASK [ :pick $WANIF ([:find $WANIF "A:"]+2) ([:find $WANIF "W:"]-1) ]
-	:set WEIGHT [ :pick $WANIF ([:find $WANIF "W:"]+2) ([:find $WANIF "L:"]-1) ]
 	if ( [ /ip firewall mangle find comment="$COMMENT $IFNAME step-5" ] = "" ) do={
 		:set MSG "5. Marking route by connections on prerouting"
 		$OUTLOG $MSG
