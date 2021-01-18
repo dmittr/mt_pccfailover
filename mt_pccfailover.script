@@ -19,7 +19,9 @@
 :local SKIP
 :local MSG
 :local WANS
-:local ALIVEWANS
+:local WANARRAY
+:local WANCOUNT 0
+:local WANBACKUP
 :local WEIGHT
 :local WEIGHTSUMM 0
 :local RCVD
@@ -49,24 +51,29 @@ if ( $OUT > 0 ) do {
 if ( [ /interface list member find list=$WANIFLIST ] = "" ) do={
 	:error "Create interface list $WANIFLIST and fill it"
 }
+
 :set WANIF [ /interface list member find list=$WANIFLIST ]
 
 :foreach IF in=$WANIF do={
+$OUTLOG $IF
 	:set SKIP 0
-	:set IFNAME [ /interface get $IF name ]
+	:set IFNAME [ /interface list member get $IF interface ]
 	:set IFADDR 0
 	:set IFROUTE 0
+	$OUTLOG $IFNAME
 	if ( [ /ip address get [ /ip address find interface=$IFNAME ] address ] = "" ) do={
 		:set SKIP 1
 	} else= {
 		:set IFADDRMASK [ /ip address get [ /ip address find interface=$IFNAME ] address ]
 		:set IFADDR [ :pick $IFADDRMASK 0 [:find $IFADDRMASK "/" ] ]
 	}
+	$OUTLOG "Getting route"
 	if ( [ /ip route find comment~"ISP-$IFNAME" ] = "" ) do={
 		:set SKIP 1
 	} else={
 		:set IFROUTE [ /ip route get [ /ip route find comment~"ISP-$IFNAME" ] gateway ]
 	}
+	$OUTLOG "Cheking..."
 	if ( $IFADDR = 0 ) do={
 		:set SKIP 1
 	} 
@@ -116,6 +123,8 @@ if ( [ /interface list member find list=$WANIFLIST ] = "" ) do={
 	:set IFADDRMASK [ :pick $WANIF ([:find $WANIF "A:"]+2) ([:find $WANIF "W:"]-1) ]
 	:set WEIGHT [ :pick $WANIF ([:find $WANIF "W:"]+2) ([:find $WANIF "L:"]-1) ]
 	:set LOST [ :pick $WANIF ([:find $WANIF "L:"]+2) [:len $WANIF] ]
+	:set SKIP 0
+	:set WANCOUNT ( $WANCOUNT + 1 )
 	if ( $LOST > $LOSTMINIMUM && ($LOST+$LOSTTOLERANCE) > $LOSTMINIMUM ) do={
 		:set WEIGHTSUMM ($WEIGHTSUMM - $WEIGHT)
 		:set MSG "$IFNAME excluded. Terminating connections"
@@ -123,14 +132,18 @@ if ( [ /interface list member find list=$WANIFLIST ] = "" ) do={
 		/ip firewall connection remove [/ip firewall connection find connection-mark="WAN-CON-$IFNAME"]
 		:set LASTCHANGE [/system clock get time]
 		:set LASTCHANGE ([:pick $LASTCHANGE 0 2] . [:pick $LASTCHANGE 3 5] . [:pick $LASTCHANGE 6 8])
-
-	} else={
-		:set ALIVEWANS ( $ALIVEWANS , "$IFNAME A:$IFADDRMASK W:$WEIGHT L:$LOST")
+		:set SKIP 1
 	}
+	if ( $WEIGHT = 0 ) do={
+		:set SKIP 1
+		:set WANBACKUP $IFNAME
+	}
+	:set WANCOUNT ( $WANCOUNT - $SKIP )
+	:set WANARRAY ( $WANARRAY , "$IFNAME A:$IFADDRMASK W:$WEIGHT L:$LOST S:$SKIP")
 }
 
 # STEP 1
-:foreach WANIF in=$ALIVEWANS do={
+:foreach WANIF in=$WANARRAY do={
 	:set IFNAME [ :pick $WANIF 0 [:find $WANIF " " ] ]
 	if ( [ /ip firewall mangle find comment="$COMMENT $IFNAME step-1" ] = "" ) do={
 		:set MSG "1. Marking incoming connections"
@@ -140,7 +153,7 @@ if ( [ /interface list member find list=$WANIFLIST ] = "" ) do={
 }
 
 # STEP 2
-:foreach WANIF in=$ALIVEWANS do={
+:foreach WANIF in=$WANARRAY do={
 	:set IFNAME [ :pick $WANIF 0 [:find $WANIF " " ] ]
 	if ( [ /ip firewall mangle find comment="$COMMENT $IFNAME step-2" ] = "" ) do={
 		:set MSG "2. Marking route by connections on output"
@@ -150,7 +163,7 @@ if ( [ /interface list member find list=$WANIFLIST ] = "" ) do={
 }
 
 # STEP 3
-:foreach WANIF in=$ALIVEWANS do={
+:foreach WANIF in=$WANARRAY do={
 	:set IFNAME [ :pick $WANIF 0 [:find $WANIF " " ] ]
 	:set IFADDRMASK [ :pick $WANIF ([:find $WANIF "A:"]+2) ([:find $WANIF "W:"]-1) ]
 	if ( [ /ip firewall mangle find comment="$COMMENT $IFNAME step-3" ] = "" ) do={
@@ -171,19 +184,22 @@ if ( [ /ip firewall mangle find chain=pcc comment~"$COMMENT PCC-$WEIGHTSUMM" ] =
 	:set MSG "4. Clearing firewall mangle PCC"
 	$OUTLOG $MSG
 	/ip firewall mangle remove [/ip firewall mangle find chain=pcc comment~"$COMMENT PCC" ]
-	:foreach WANIF in=$ALIVEWANS do={
+	:foreach WANIF in=$WANARRAY do={
 		:set IFNAME [ :pick $WANIF 0 [:find $WANIF " " ] ]
 		:set WEIGHT [ :pick $WANIF ([:find $WANIF "W:"]+2) ([:find $WANIF "L:"]-1) ]
-		:for n from=1 to=$WEIGHT step=1 do={
-			/ip firewall mangle add chain=pcc in-interface-list=$LANIFLIST dst-address-type=!local per-connection-classifier="both-addresses-and-ports:$WEIGHTSUMM/$COUNTER" action=mark-connection new-connection-mark="WAN-CON-$IFNAME" passthrough=yes comment="$COMMENT PCC-$WEIGHTSUMM step-4"
-			:set COUNTER ($COUNTER+1)
+		:set SKIP [ :pick $WANIF ([:find $WANIF "S:"]+2) [:len $WANIF] ]
+		if ( $SKIP = 0 ) do={
+			:for n from=1 to=$WEIGHT step=1 do={
+				/ip firewall mangle add chain=pcc in-interface-list=$LANIFLIST connection-state=new dst-address-type=!local per-connection-classifier="both-addresses-and-ports:$WEIGHTSUMM/$COUNTER" action=mark-connection new-connection-mark="WAN-CON-$IFNAME" passthrough=yes comment="$COMMENT PCC-$WEIGHTSUMM step-4"
+				:set COUNTER ($COUNTER+1)
+			}
+			:set MSG "4. Created firewall mangle PCC for $IFNAME x$WEIGHT"
+			$OUTLOG $MSG
 		}
-		:set MSG "4. Created firewall mangle PCC for $IFNAME x$WEIGHT"
-		$OUTLOG $MSG
 	}
 }
 # STEP 5
-:foreach WANIF in=$ALIVEWANS do={
+:foreach WANIF in=$WANARRAY do={
 	:set IFNAME [ :pick $WANIF 0 [:find $WANIF " " ] ]
 	if ( [ /ip firewall mangle find comment="$COMMENT $IFNAME step-5" ] = "" ) do={
 		:set MSG "5. Marking route by connections on prerouting"
@@ -191,4 +207,3 @@ if ( [ /ip firewall mangle find chain=pcc comment~"$COMMENT PCC-$WEIGHTSUMM" ] =
 		/ip firewall mangle add chain=prerouting connection-mark="WAN-CON-$IFNAME" in-interface-list=$LANIFLIST action=mark-routing new-routing-mark="WAN-RM-$IFNAME" comment="$COMMENT $IFNAME step-5"
 	}
 }
-
