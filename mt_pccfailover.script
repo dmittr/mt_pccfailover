@@ -179,7 +179,7 @@ if ( [ /ip firewall address-list find list=private_nets ] = "" ) do={
 if ( [ /ip firewall mangle find chain=prerouting action=jump jump-target=pcc comment="$COMMENT" ] = "" ) do={
 	:set MSG "4. Creating mangle on incoming for $IFNAME"
 	$OUTLOG $MSG
-	/ip firewall mangle add chain=prerouting action=jump jump-target=pcc comment="$COMMENT"
+	/ip firewall mangle add chain=prerouting action=jump jump-target=pcc comment="$COMMENT" in-interface-list=$LANIFLIST connection-state=new dst-address-list=!private_nets
 }	
 if ( [ /ip firewall mangle find chain=pcc comment~"$COMMENT PCC-$WEIGHTSUMM" ] = "" ) do={
 	:set MSG "4. Clearing firewall mangle PCC"
@@ -191,7 +191,7 @@ if ( [ /ip firewall mangle find chain=pcc comment~"$COMMENT PCC-$WEIGHTSUMM" ] =
 		:set SKIP [ :pick $WANIF ([:find $WANIF "S:"]+2) [:len $WANIF] ]
 		if ( $SKIP = 0 ) do={
 			:for n from=1 to=$WEIGHT step=1 do={
-				/ip firewall mangle add chain=pcc in-interface-list=$LANIFLIST connection-state=new dst-address-list=!private_nets per-connection-classifier="both-addresses-and-ports:$WEIGHTSUMM/$COUNTER" action=mark-connection new-connection-mark="WAN-CON-$IFNAME" passthrough=yes comment="$COMMENT PCC-$WEIGHTSUMM step-4"
+				/ip firewall mangle add chain=pcc per-connection-classifier="both-addresses-and-ports:$WEIGHTSUMM/$COUNTER" action=mark-connection new-connection-mark="WAN-CON-$IFNAME" passthrough=yes comment="$COMMENT PCC-$WEIGHTSUMM step-4"
 				:set COUNTER ($COUNTER+1)
 			}
 			:set MSG "4. Created firewall mangle PCC for $IFNAME x$WEIGHT"
