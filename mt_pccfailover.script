@@ -1,5 +1,5 @@
 ################## Variables ##################
-:global LOG 0
+:global LOG 1
 :global OUT 1
 :local PINGCOUNT 10
 :local TARGETS [ :toarray "8.8.8.8,8.8.4.4,77.88.8.8,77.88.8.1" ]
@@ -60,20 +60,17 @@ $OUTLOG $IF
 	:set IFNAME [ /interface list member get $IF interface ]
 	:set IFADDR 0
 	:set IFROUTE 0
-	$OUTLOG $IFNAME
 	if ( [ /ip address get [ /ip address find interface=$IFNAME ] address ] = "" ) do={
 		:set SKIP 1
 	} else= {
 		:set IFADDRMASK [ /ip address get [ /ip address find interface=$IFNAME ] address ]
 		:set IFADDR [ :pick $IFADDRMASK 0 [:find $IFADDRMASK "/" ] ]
 	}
-	$OUTLOG "Getting route"
 	if ( [ /ip route find comment~"ISP-$IFNAME" ] = "" ) do={
 		:set SKIP 1
 	} else={
 		:set IFROUTE [ /ip route get [ /ip route find comment~"ISP-$IFNAME" ] gateway ]
 	}
-	$OUTLOG "Cheking..."
 	if ( $IFADDR = 0 ) do={
 		:set SKIP 1
 	} 
@@ -190,7 +187,7 @@ if ( [ /ip firewall mangle find chain=pcc comment~"$COMMENT PCC-$WEIGHTSUMM" ] =
 		:set SKIP [ :pick $WANIF ([:find $WANIF "S:"]+2) [:len $WANIF] ]
 		if ( $SKIP = 0 ) do={
 			:for n from=1 to=$WEIGHT step=1 do={
-				/ip firewall mangle add chain=pcc in-interface-list=$LANIFLIST connection-state=new dst-address-type=!local per-connection-classifier="both-addresses-and-ports:$WEIGHTSUMM/$COUNTER" action=mark-connection new-connection-mark="WAN-CON-$IFNAME" passthrough=yes comment="$COMMENT PCC-$WEIGHTSUMM step-4"
+				/ip firewall mangle add chain=pcc in-interface-list=$LANIFLIST dst-address-type=!local per-connection-classifier="both-addresses-and-ports:$WEIGHTSUMM/$COUNTER" action=mark-connection new-connection-mark="WAN-CON-$IFNAME" passthrough=yes comment="$COMMENT PCC-$WEIGHTSUMM step-4"
 				:set COUNTER ($COUNTER+1)
 			}
 			:set MSG "4. Created firewall mangle PCC for $IFNAME x$WEIGHT"
