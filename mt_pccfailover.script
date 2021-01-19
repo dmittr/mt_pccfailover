@@ -55,7 +55,6 @@ if ( [ /interface list member find list=$WANIFLIST ] = "" ) do={
 :set WANIF [ /interface list member find list=$WANIFLIST ]
 
 :foreach IF in=$WANIF do={
-$OUTLOG $IF
 	:set SKIP 0
 	:set IFNAME [ /interface list member get $IF interface ]
 	:set IFADDR 0
@@ -187,7 +186,7 @@ if ( [ /ip firewall mangle find chain=pcc comment~"$COMMENT PCC-$WEIGHTSUMM" ] =
 		:set SKIP [ :pick $WANIF ([:find $WANIF "S:"]+2) [:len $WANIF] ]
 		if ( $SKIP = 0 ) do={
 			:for n from=1 to=$WEIGHT step=1 do={
-				/ip firewall mangle add chain=pcc in-interface-list=$LANIFLIST dst-address-type=!local per-connection-classifier="both-addresses-and-ports:$WEIGHTSUMM/$COUNTER" action=mark-connection new-connection-mark="WAN-CON-$IFNAME" passthrough=yes comment="$COMMENT PCC-$WEIGHTSUMM step-4"
+				/ip firewall mangle add chain=pcc in-interface-list=$LANIFLIST connection-state=new dst-address-type=!local per-connection-classifier="both-addresses-and-ports:$WEIGHTSUMM/$COUNTER" action=mark-connection new-connection-mark="WAN-CON-$IFNAME" passthrough=yes comment="$COMMENT PCC-$WEIGHTSUMM step-4"
 				:set COUNTER ($COUNTER+1)
 			}
 			:set MSG "4. Created firewall mangle PCC for $IFNAME x$WEIGHT"
