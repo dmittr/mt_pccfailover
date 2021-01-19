@@ -1,5 +1,5 @@
 ################## Variables ##################
-:global LOG 1
+:global LOG 0
 :global OUT 1
 :local PINGCOUNT 10
 :local TARGETS [ :toarray "8.8.8.8,8.8.4.4,77.88.8.8,77.88.8.1" ]
@@ -50,6 +50,11 @@ if ( $OUT > 0 ) do {
 
 if ( [ /interface list member find list=$WANIFLIST ] = "" ) do={
 	:error "Create interface list $WANIFLIST and fill it"
+}
+if ( [ /ip firewall address-list find list=private_nets ] = "" ) do={
+	/ip firewall address-list add address=10.0.0.0/8 list=private_nets
+	/ip firewall address-list add address=172.16.0.0/12 list=private_nets
+	/ip firewall address-list add address=192.168.0.0/16 list=private_nets
 }
 
 :set WANIF [ /interface list member find list=$WANIFLIST ]
@@ -186,7 +191,7 @@ if ( [ /ip firewall mangle find chain=pcc comment~"$COMMENT PCC-$WEIGHTSUMM" ] =
 		:set SKIP [ :pick $WANIF ([:find $WANIF "S:"]+2) [:len $WANIF] ]
 		if ( $SKIP = 0 ) do={
 			:for n from=1 to=$WEIGHT step=1 do={
-				/ip firewall mangle add chain=pcc in-interface-list=$LANIFLIST connection-state=new dst-address-type=!local per-connection-classifier="both-addresses-and-ports:$WEIGHTSUMM/$COUNTER" action=mark-connection new-connection-mark="WAN-CON-$IFNAME" passthrough=yes comment="$COMMENT PCC-$WEIGHTSUMM step-4"
+				/ip firewall mangle add chain=pcc in-interface-list=$LANIFLIST connection-state=new dst-address-list=!private_nets per-connection-classifier="both-addresses-and-ports:$WEIGHTSUMM/$COUNTER" action=mark-connection new-connection-mark="WAN-CON-$IFNAME" passthrough=yes comment="$COMMENT PCC-$WEIGHTSUMM step-4"
 				:set COUNTER ($COUNTER+1)
 			}
 			:set MSG "4. Created firewall mangle PCC for $IFNAME x$WEIGHT"
