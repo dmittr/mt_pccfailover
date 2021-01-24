@@ -41,7 +41,13 @@
 		:log info "$1"
 	}
 }
-
+:local GETPARAM do={
+	:local part [ :pick "$1" ([:find "$1" "$2"]+([:len "$2"])+1) [ :len $1 ] ]
+	if ( [:find $part " "] ) do={
+		:set part [ :pick $part 0 ([:find $part " "]) ]
+	}
+	:return $part
+}
 
 :set MSG "Start!\n\r LOG=$LOG\n\r OUT=$OUT"
 if ( $OUT > 0 ) do {
@@ -85,8 +91,7 @@ if ( [ /ip firewall address-list find list=private_nets ] = "" ) do={
 	$OUTLOG $MSG
 	
 	if ( $SKIP = 0 ) do={
-		:set WEIGHT [ /ip route get [ /ip route find comment~"ISP-$IFNAME" ] comment ]
-		:set WEIGHT [ :pick $WEIGHT ([ :find $WEIGHT "weight=" ]+7) [ :len $WEIGHT ] ]
+		:set WEIGHT [ $GETPARAM [ /ip route get [ /ip route find comment~"ISP-$IFNAME" ] comment ] "weight" ]
 		if ( [ :len $WEIGHT ] != 1 ) do={
 			:set WEIGHT 1
 		}
