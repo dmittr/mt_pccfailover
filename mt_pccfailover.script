@@ -1,5 +1,5 @@
 ################## Variables ##################
-:global LOG 0
+:global LOG 1
 :global OUT 1
 :local PINGCOUNT 10
 :local TARGETS [ :toarray "8.8.8.8,8.8.4.4,77.88.8.8,77.88.8.1" ]
@@ -153,8 +153,10 @@ if ( [ /ip firewall address-list find list=private_nets ] = "" ) do={
 		:set LASTCHANGE ([:pick $LASTCHANGE 0 2] . [:pick $LASTCHANGE 3 5] . [:pick $LASTCHANGE 6 8])
 		:set SKIP 1
 	} else={
-		/ip route set [ /ip route find comment~"ISP-$IFNAME" ] distance=$WANCOUNT
-		if ( [ interface gre find local-address="$IFADDR" disabled=yes ] = "" ) do={
+		/ip route set [ /ip route find comment~"ISP-$IFNAME" distance=250 ] distance=$WANCOUNT
+		if ( [ /interface gre find local-address="$IFADDR" disabled=yes ] != "" ) do={
+			:set MSG "Returning tun ($IFADDR) interface"
+			$OUTLOG $MSG
 			/interface gre set [ /interface gre find local-address="$IFADDR" disabled=yes ] disabled=no
 		}
 	}
