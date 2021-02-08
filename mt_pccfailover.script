@@ -48,15 +48,19 @@
 	}
 	:return $part
 }
+###############################################
 
 :set MSG "Start!\n\r LOG=$LOG\n\r OUT=$OUT"
 if ( $OUT > 0 ) do {
 	:put "$MSG"
 }
 
+### Check WANIFLIST exist #####################
 if ( [ /interface list member find list=$WANIFLIST ] = "" ) do={
 	:error "Create interface list $WANIFLIST and fill it"
 }
+
+### Create default address lists ##############
 if ( [ /ip firewall address-list find list=private_nets ] = "" ) do={
 	/ip firewall address-list add address=10.0.0.0/8 list=private_nets
 	/ip firewall address-list add address=172.16.0.0/12 list=private_nets
@@ -64,7 +68,6 @@ if ( [ /ip firewall address-list find list=private_nets ] = "" ) do={
 }
 
 :set WANIF [ /interface list member find list=$WANIFLIST ]
-
 :foreach IF in=$WANIF do={
 	:set SKIP 0
 	:set IFNAME [ /interface list member get $IF interface ]
@@ -72,7 +75,7 @@ if ( [ /ip firewall address-list find list=private_nets ] = "" ) do={
 	:set IFROUTE 0
 	if ( [ /ip address get [ /ip address find interface=$IFNAME ] address ] = "" ) do={
 		:set SKIP 1
-	} else= {
+	} else={
 		:set IFADDRMASK [ /ip address get [ /ip address find interface=$IFNAME ] address ]
 		:set IFADDR [ :pick $IFADDRMASK 0 [:find $IFADDRMASK "/" ] ]
 	}
@@ -82,31 +85,37 @@ if ( [ /ip firewall address-list find list=private_nets ] = "" ) do={
 		:set IFROUTE [ /ip route get [ /ip route find comment~"ISP-$IFNAME" ] gateway ]
 	}
 	if ( $IFADDR = 0 ) do={
+### Skip WAN interface wihout address #########
 		:set SKIP 1
 	} 
 	if ( $IFROUTE = 0 ) do={
+### Skip WAN interface wihout route comment ###
 		:set SKIP 1
 	} 
 	:set MSG "IFNAME=$IFNAME IFADDR=$IFADDR IFROUTE=$IFROUTE SKIP=$SKIP"
 	$OUTLOG $MSG
 	
 	if ( $SKIP = 0 ) do={
+### Get WAN interface weight ##################
 		:set WEIGHT [ $GETPARAM [ /ip route get [ /ip route find comment~"ISP-$IFNAME" ] comment ] "weight" ]
 		if ( [ :len $WEIGHT ] != 1 ) do={
 			:set WEIGHT 1
 		}
 		if ( [ /ip route find gateway=$IFROUTE routing-mark="WAN-RM-$IFNAME" comment=$COMMENT ] = "" ) do={
+### Create routing table for each WAN #########
 			:set MSG "Creating route with mark for $IFNAME"
 			$OUTLOG $MSG
 			/ip route add gateway=$IFROUTE routing-mark="WAN-RM-$IFNAME" comment=$COMMENT
 		}
 		if ( [ /ip route rule find src-address="$IFADDR/32" table="WAN-RM-$IFNAME" comment=$COMMENT ] = "" ) do={
+### Create routing rule for each WAN ##########
 			:set MSG "Creating route rule for $IFNAME"
 			$OUTLOG $MSG
 			/ip route rule add src-address="$IFADDR/32" table="WAN-RM-$IFNAME" comment=$COMMENT
 		}
 		:set RCVD 0
 		:set SENT 0
+### Make icmp tests ###########################
 		:foreach TARGET in $TARGETS do={
 			:for n from=1 to=$PINGCOUNT step=1 do={
 				:set RCVD ( [ /ping $TARGET src-address=$IFADDR interval="$TIMEOUT" count=1 ] + $RCVD )
@@ -127,28 +136,38 @@ if ( [ /ip firewall address-list find list=private_nets ] = "" ) do={
 :foreach WANIF in=$WANS do={
 	:set IFNAME [ :pick $WANIF 0 [:find $WANIF " " ] ]
 	:set IFADDRMASK [ :pick $WANIF ([:find $WANIF "A:"]+2) ([:find $WANIF "W:"]-1) ]
+	:set IFADDR [ :pick $IFADDRMASK 0 [:find $IFADDRMASK "/" ] ]
 	:set WEIGHT [ :pick $WANIF ([:find $WANIF "W:"]+2) ([:find $WANIF "L:"]-1) ]
 	:set LOST [ :pick $WANIF ([:find $WANIF "L:"]+2) [:len $WANIF] ]
 	:set SKIP 0
 	:set WANCOUNT ( $WANCOUNT + 1 )
 	if ( $LOST > $LOSTMINIMUM && ($LOST+$LOSTTOLERANCE) > $LOSTMINIMUM ) do={
 		:set WEIGHTSUMM ($WEIGHTSUMM - $WEIGHT)
-		:set MSG "$IFNAME excluded. Terminating connections"
+		:set MSG "$IFNAME excluded. Terminating connections, degrading route and disabling tun"
 		$OUTLOG $MSG
+### Terminating connections of failed WAN #####
 		/ip firewall connection remove [/ip firewall connection find connection-mark="WAN-CON-$IFNAME"]
+		/ip route set [ /ip route find comment~"ISP-$IFNAME" ] distance=250
+		/interface gre set [ /interface gre find local-address="$IFADDR" ] disabled=yes
 		:set LASTCHANGE [/system clock get time]
 		:set LASTCHANGE ([:pick $LASTCHANGE 0 2] . [:pick $LASTCHANGE 3 5] . [:pick $LASTCHANGE 6 8])
 		:set SKIP 1
+	} else={
+		/ip route set [ /ip route find comment~"ISP-$IFNAME" ] distance=$WANCOUNT
+		if ( [ interface gre find local-address="$IFADDR" disabled=yes ] = "" ) do={
+			/interface gre set [ /interface gre find local-address="$IFADDR" disabled=yes ] disabled=no
+		}
 	}
 	if ( $WEIGHT = 0 ) do={
 		:set SKIP 1
 		:set WANBACKUP $IFNAME
 	}
+### Forming new array of WANs #################
 	:set WANCOUNT ( $WANCOUNT - $SKIP )
 	:set WANARRAY ( $WANARRAY , "$IFNAME A:$IFADDRMASK W:$WEIGHT L:$LOST S:$SKIP")
 }
 
-# STEP 1
+### STEP 1 - Marking incoming connections
 :foreach WANIF in=$WANARRAY do={
 	:set IFNAME [ :pick $WANIF 0 [:find $WANIF " " ] ]
 	if ( [ /ip firewall mangle find comment="$COMMENT $IFNAME step-1" ] = "" ) do={
@@ -158,7 +177,7 @@ if ( [ /ip firewall address-list find list=private_nets ] = "" ) do={
 	}
 }
 
-# STEP 2
+###  STEP 2 - Marking route by connections on output
 :foreach WANIF in=$WANARRAY do={
 	:set IFNAME [ :pick $WANIF 0 [:find $WANIF " " ] ]
 	if ( [ /ip firewall mangle find comment="$COMMENT $IFNAME step-2" ] = "" ) do={
@@ -168,7 +187,7 @@ if ( [ /ip firewall address-list find list=private_nets ] = "" ) do={
 	}
 }
 
-# STEP 3
+### STEP 3 - Allow to access ISP subnet
 :foreach WANIF in=$WANARRAY do={
 	:set IFNAME [ :pick $WANIF 0 [:find $WANIF " " ] ]
 	:set IFADDRMASK [ :pick $WANIF ([:find $WANIF "A:"]+2) ([:find $WANIF "W:"]-1) ]
@@ -179,7 +198,7 @@ if ( [ /ip firewall address-list find list=private_nets ] = "" ) do={
 	}
 }
 
-# STEP 4
+### STEP 4 - Creating firewall mangle PCC
 :set COUNTER 0
 if ( [ /ip firewall mangle find chain=prerouting action=jump jump-target=pcc comment="$COMMENT" ] = "" ) do={
 	:set MSG "4. Creating mangle on incoming for $IFNAME"
@@ -204,7 +223,7 @@ if ( [ /ip firewall mangle find chain=pcc comment~"$COMMENT PCC-$WEIGHTSUMM" ] =
 		}
 	}
 }
-# STEP 5
+### STEP 5 - Marking route by connections on prerouting
 :foreach WANIF in=$WANARRAY do={
 	:set IFNAME [ :pick $WANIF 0 [:find $WANIF " " ] ]
 	if ( [ /ip firewall mangle find comment="$COMMENT $IFNAME step-5" ] = "" ) do={
