@@ -1,8 +1,4 @@
-# feb/08/2021 15:21:52 by RouterOS 6.47.3
-# software id = NZ0K-1PZI
-#
-# model = RB960PGS
-# serial number = CB540C47E350
+
 /system script
 add dont-require-permissions=no name=mt_pccfailover owner=admin policy=\
     ftp,reboot,read,write,policy,test,password,sniff,sensitive,romon source="#\
