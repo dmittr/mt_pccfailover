@@ -3,7 +3,7 @@
     ########### Variables ##################\
     \n:global LOG 1\
     \n:global OUT 1\
-    \n:local PINGCOUNT 10\
+    \n:local PINGCOUNT 1\
     \n:local TIMEOUT \"0.2\"\
     \n:local LOSTTOLERANCE 10\
     \n:local COMMENT \"--ispswitch script--\"\
