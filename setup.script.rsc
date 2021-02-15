@@ -1,19 +1,4 @@
-/system script
-add dont-require-permissions=no name=pcc owner=darya policy=\
-    ftp,reboot,read,write,policy,test,password,sniff,sensitive,romon source="#######\
-    ########### Variables ##################\
-    \n:global LOG 1\
-    \n:global OUT 1\
-    \n:local PINGCOUNT 10\
-    \n:local TARGETS [ :toarray \"8.8.8.8,8.8.4.4,77.88.8.8,77.88.8.1\" ]\
-    \n:local TIMEOUT \"0.2\"\
-    \n:local LOSTTOLERANCE 10\
-    \n:local COMMENT \"--ispswitch script--\"\
-    \n:local LANIFLIST \"LAN\"\
-    \n:local WANIFLIST \"WAN\"\
-    \n\
-    \n###############################################\
-    \n:global LASTCHANGE\
+/system script add name=mt_pccfailover.script owner=admin policy=read,write,policy,test,sensitive source=":global LASTCHANGE\
     \n:local WANIF\
     \n:local IFNAME\
     \n:local IFADDR\
@@ -281,3 +266,18 @@ add dont-require-permissions=no name=pcc owner=darya policy=\
     \n\t}\
     \n}\
     \n"
+    
+/system script add name=startup_set_global_vars.script owner=admin policy=read,write,policy,test source=":global LOG 1\
+    \n:global OUT 1
+    \n:global PINGCOUNT 10\
+    \n:global TARGETS [ :toarray \"8.8.8.8,8.8.4.4,77.88.8.8,77.88.8.1\" ]\
+    \n:global TIMEOUT \"0.2\"\
+    \n:global LOSTTOLERANCE 1\
+    \n:global COMMENT \"--ispswitch script--\"\
+    \n:global LANIFLIST \"LAN\"\
+    \n:global WANIFLIST \"WAN\"\
+    \n:global MATTERMOSTURL \"\"\
+    \n"
+
+/system scheduler add name=startup_set_global_vars on-event=startup_set_global_vars.script policy=read,write,policy,test start-time=startup
+/system scheduler add interval=5m name=mt_pccfailover on-event=mt_pccfailover.script policy=read,write,policy,test,sensitive
