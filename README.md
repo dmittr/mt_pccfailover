@@ -22,3 +22,10 @@ Mikrotik PCC Failover
 + Увеличивается метрика маршрута в GRT до 250
 + Выключаются интерфейсы GRE привязанные к адресу провайдера
 + Удаляются MANGLE правила
+
+Установка
+
+````
+/tool fetch mode=https url="https://raw.githubusercontent.com/dmittr/mt_pccfailover/main/setup.script.rsc" http-method=get output=file
+/import file-name=setup.script.rsc
+````
