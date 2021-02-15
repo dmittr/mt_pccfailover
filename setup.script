@@ -4,7 +4,6 @@
     \n:global LOG 1\
     \n:global OUT 1\
     \n:local PINGCOUNT 10\
-    \n:local TARGETS [ :toarray \"8.8.8.8,8.8.4.4,77.88.8.8,77.88.8.1\" ]\
     \n:local TIMEOUT \"0.2\"\
     \n:local LOSTTOLERANCE 10\
     \n:local COMMENT \"--ispswitch script--\"\
