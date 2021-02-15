@@ -3,6 +3,5 @@
 #
 # model = 
 # serial number = 000000000
-
 /system script add name=mt_pccfailover.script owner=admin source="111"
 
