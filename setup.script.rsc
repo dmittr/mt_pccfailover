@@ -274,8 +274,9 @@
     \n}\
     \n"
     
-/system script add name=startup_set_global_vars.script owner=admin policy=read,write,policy,test source=":global LOG 1\
-    \n:global OUT 1
+/system script add dont-require-permissions=no name=startup_set_global_vars.script owner=admin \
+    policy=read,write,policy,test source=":global LOG 1\
+    \n:global OUT 1\
     \n:global PINGCOUNT 10\
     \n:global TARGETS [ :toarray \"8.8.8.8,8.8.4.4,77.88.8.8,77.88.8.1\" ]\
     \n:global TIMEOUT \"0.2\"\
@@ -284,6 +285,7 @@
     \n:global LANIFLIST \"LAN\"\
     \n:global WANIFLIST \"WAN\"\
     \n:global MATTERMOSTURL \"\"\
+    \n:global MATTERMOSTDST \"\"\
     \n"
 
 /system scheduler add name=startup_set_global_vars on-event=startup_set_global_vars.script policy=read,write,policy,test start-time=startup
