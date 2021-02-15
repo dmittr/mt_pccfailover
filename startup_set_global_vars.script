@@ -1,0 +1,10 @@
+:global LOG 1
+:global OUT 1
+:global PINGCOUNT 10
+:global TARGETS [ :toarray "8.8.8.8,8.8.4.4,77.88.8.8,77.88.8.1" ]
+:global TIMEOUT "0.2"
+:global LOSTTOLERANCE 1
+:global COMMENT "--ispswitch script--"
+:global LANIFLIST "LAN"
+:global WANIFLIST "WAN"
+:global MATTERMOSTURL ""
