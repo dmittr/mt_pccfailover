@@ -4,8 +4,5 @@
 # model = 
 # serial number = 000000000
 
-/system script add dont-require-permissions=no name=mt_pccfailover.script owner=admin policy=\
-    read,write,policy,test,sniff,sensitive,romon source="#######\
-    \n:global LOG 1\
-    \n:global OUT 1\"
+/system script add name=mt_pccfailover.script owner=admin source="111"
 
