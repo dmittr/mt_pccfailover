@@ -28,4 +28,5 @@ Mikrotik PCC Failover
 ````
 /tool fetch mode=https url="https://raw.githubusercontent.com/dmittr/mt_pccfailover/main/setup.script.rsc" http-method=get output=file
 /import file-name=setup.script.rsc
+/system script run startup_set_global_vars.script
 ````
