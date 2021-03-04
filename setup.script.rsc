@@ -1,4 +1,15 @@
-/system script add name=mt_pccfailover.script owner=admin policy=read,write,policy,test,sensitive source=":global LASTCHANGE\
+/system script add name=mt_pccfailover.script owner=admin policy=read,write,policy,test,sensitive source=":global OUT\
+    \n:global LOG\
+    \n:global LASTCHANGE\
+    \n:global PINGCOUNT\
+    \n:global TARGETS\
+    \n:global TIMEOUT\
+    \n:global LOSTTOLERANCE\
+    \n:global COMMENT\
+    \n:global LANIFLIST\
+    \n:global WANIFLIST\
+    \n:global MATTERMOSTURL\
+    \n:global MATTERMOSTDST\
     \n:local WANIF\
     \n:local IFNAME\
     \n:local IFADDR\
