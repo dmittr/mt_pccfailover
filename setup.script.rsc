@@ -34,8 +34,8 @@
     \n:local OUTLOG do={\
     \n\t:global LOG\
     \n\t:global OUT\
-    \n\t:MATTERMOSTURL\
-    \n\t:MATTERMOSTDST\
+    \n\t:global MATTERMOSTURL\
+    \n\t:global MATTERMOSTDST\
     \n\tif ( \$OUT > 0 ) do {\
     \n\t\t:put \"\$1\"\
     \n\t}\
