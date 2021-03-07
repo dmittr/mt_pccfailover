@@ -1,6 +1,5 @@
 /system script add name=mt_pccfailover.script owner=admin policy=read,write,policy,test,sensitive source=":global OUT\
     \n:global LOG\
-    \n:global LASTCHANGE\
     \n:global PINGCOUNT\
     \n:global TARGETS\
     \n:global TIMEOUT\
@@ -15,8 +14,10 @@
     \n:local IFADDR\
     \n:local IFADDRMASK\
     \n:local IFROUTE\
+    \n:local IFCOMMENT\
     \n:local SKIP\
     \n:local MSG\
+    \n:local MMMSG \"\"\
     \n:local WANS\
     \n:local WANARRAY\
     \n:local WANCOUNT 0\
@@ -28,25 +29,27 @@
     \n:local LOST\
     \n:local LOSTMINIMUM 9999\
     \n:local COUNTER\
-    \n:local HOSTNAME [ /system identity get name ]\
     \n\
     \n################## Functions ##################\
     \n:local OUTLOG do={\
     \n\t:global LOG\
     \n\t:global OUT\
-    \n\t:global MATTERMOSTURL\
-    \n\t:global MATTERMOSTDST\
     \n\tif ( \$OUT > 0 ) do {\
     \n\t\t:put \"\$1\"\
     \n\t}\
     \n\tif ( \$LOG > 0 ) do {\
     \n\t\t:log info \"\$1\"\
     \n\t}\
+    \n}\
+    \n:local MMSEND do={\
+    \n\t:global MATTERMOSTURL\
+    \n\t:global MATTERMOSTDST\
+    \n\t:local HOSTNAME [ /system identity get name ]\
     \n\tif ( \$MATTERMOSTURL != \"\" ) do {\
-    \n\t\t/tool fetch mode=https url=\"\$MATTERMOSTURL\" http-method=post http-data\
-    =\"{\\\"text\\\": \\\"\$1\\\", \\\"channel\\\": \\\"\$MATTERMOSTDST\\\", \\\"us\
-    ername\\\": \\\"\$HOSTNAME\\\"}\" http-header-field=\"content-type: application\
-    /json\"\
+    \n\t\t/tool fetch mode=https keep-result=no url=\"\$MATTERMOSTURL\" http-method\
+    =post http-data=\"{\\\"text\\\": \\\"\$1\\\", \\\"channel\\\": \\\"\$MATTERMOST\
+    DST\\\", \\\"username\\\": \\\"\$HOSTNAME\\\"}\" http-header-field=\"content-ty\
+    pe: application/json\"\
     \n\t}\
     \n}\
     \n:local GETPARAM do={\
@@ -151,7 +154,6 @@
     \n\t\t\$OUTLOG \$MSG\t\
     \n\t}\
     \n}\
-    \n\
     \n:foreach WANIF in=\$WANS do={\
     \n\t:set IFNAME [ :pick \$WANIF 0 [:find \$WANIF \" \" ] ]\
     \n\t:set IFADDRMASK [ :pick \$WANIF ([:find \$WANIF \"A:\"]+2) ([:find \$WANIF \
@@ -162,6 +164,8 @@
     \n\t:set LOST [ :pick \$WANIF ([:find \$WANIF \"L:\"]+2) [:len \$WANIF] ]\
     \n\t:set SKIP 0\
     \n\t:set WANCOUNT ( \$WANCOUNT + 1 )\
+    \n\t:set IFCOMMENT [ /ip address get [ /ip address find interface=\$IFNAME ] co\
+    mment ]\
     \n\tif ( \$LOST > \$LOSTMINIMUM && (\$LOST+\$LOSTTOLERANCE) > \$LOSTMINIMUM ) d\
     o={\
     \n\t\t:set WEIGHTSUMM (\$WEIGHTSUMM - \$WEIGHT)\
@@ -172,21 +176,28 @@
     \n\t\t/ip firewall connection remove [/ip firewall connection find connection-m\
     ark=\"WAN-CON-\$IFNAME\"]\
     \n\t\t/ip route set [ /ip route find comment~\"ISP-\$IFNAME\" ] distance=250\
-    \n\t\t/interface gre set [ /interface gre find local-address=\"\$IFADDR\" ] dis\
-    abled=yes\
-    \n\t\t:set LASTCHANGE [/system clock get time]\
-    \n\t\t:set LASTCHANGE ([:pick \$LASTCHANGE 0 2] . [:pick \$LASTCHANGE 3 5] . [:\
-    pick \$LASTCHANGE 6 8])\
+    \n\t\t:set MMMSG \"\$MMMSG\\n\$IFCOMMENT (\$IFNAME) down, \$LOST lost\"\
+    \n\t\tif ( [ /interface gre find local-address=\"\$IFADDR\" disabled=no ] != \"\
+    \" ) do={\
+    \n\t\t\t/interface gre set [ /interface gre find local-address=\"\$IFADDR\" ] d\
+    isabled=yes\
+    \n\t\t\t:set MMMSG \"\$MMMSG\\ntun via \$IFADDR disabled\"\
+    \n\t\t}\
     \n\t\t:set SKIP 1\
     \n\t} else={\
-    \n\t\t/ip route set [ /ip route find comment~\"ISP-\$IFNAME\" distance=250 ] di\
-    stance=\$WANCOUNT\
+    \n\t\tif ( [ /ip route find comment~\"ISP-\$IFNAME\" distance=250 ] != \"\" ) d\
+    o={\
+    \n\t\t\t/ip route set [ /ip route find comment~\"ISP-\$IFNAME\" distance=250 ] \
+    distance=\$WANCOUNT\
+    \n\t\t\t:set MMMSG \"\$MMMSG\\n\$IFCOMMENT (\$IFNAME) up\"\
+    \n\t\t}\
     \n\t\tif ( [ /interface gre find local-address=\"\$IFADDR\" disabled=yes ] != \
     \"\" ) do={\
     \n\t\t\t:set MSG \"Returning tun (\$IFADDR) interface\"\
     \n\t\t\t\$OUTLOG \$MSG\
     \n\t\t\t/interface gre set [ /interface gre find local-address=\"\$IFADDR\" dis\
     abled=yes ] disabled=no\
+    \n\t\t\t:set MMMSG \"\$MMMSG\\ntun via \$IFADDR enabled\"\
     \n\t\t}\
     \n\t}\
     \n\tif ( \$WEIGHT = 0 ) do={\
@@ -268,6 +279,10 @@
     M step-4\"\
     \n\t\t\t\t:set COUNTER (\$COUNTER+1)\
     \n\t\t\t}\
+    \n\t\t\t:set IFCOMMENT [ /ip address get [ /ip address find interface=\$IFNAME \
+    ] comment ]\
+    \n\t\t\t:set MMMSG \"\$MMMSG\\n\$IFCOMMENT (\$IFNAME) pcc weight \$WEIGHT/\$WEI\
+    GHTSUMM\"\
     \n\t\t\t:set MSG \"4. Created firewall mangle PCC for \$IFNAME x\$WEIGHT\"\
     \n\t\t\t\$OUTLOG \$MSG\
     \n\t\t}\
@@ -284,6 +299,9 @@
     ME\" in-interface-list=\$LANIFLIST action=mark-routing new-routing-mark=\"WAN-R\
     M-\$IFNAME\" comment=\"\$COMMENT \$IFNAME step-5\"\
     \n\t}\
+    \n}\
+    \nif ( \$MMMSG != \"\" ) do={\
+    \n\t\$MMSEND \$MMMSG\
     \n}\
     \n"
     
